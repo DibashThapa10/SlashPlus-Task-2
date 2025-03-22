@@ -1,16 +1,18 @@
-# task_2
+# Slash Plus Task 2
 
-A new Flutter project.
+A Flutter App that uses the BloC state management library to play video with pause and resume logic by following a provided specific sequence using three videos.
 
-## Getting Started
+# Dependencies
 
-This project is a starting point for a Flutter application.
+This app depends on the following packages:
 
-A few resources to get you started if this is your first Flutter project:
+• flutter_bloc: ^9.1.0 • video_player: ^2.9.3 
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Screen Recording of App.
+
+
+
+
+https://github.com/user-attachments/assets/0eccecb5-4b3a-49a1-aab3-36799050d93b
+
