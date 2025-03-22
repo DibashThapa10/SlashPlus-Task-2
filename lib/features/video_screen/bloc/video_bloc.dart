@@ -25,6 +25,7 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     on<AppResumed>(_onAppResumed);
   }
 
+  // Initialize videos and setup position listeners
   Future<void> _onInitialize(
     InitializeVideos event,
     Emitter<VideoState> emit,
@@ -45,17 +46,6 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
 
         // Add the listener to the video controller
         video.controller.addListener(listener);
-
-        // _positionSubscriptions.add(
-        //   video.controller.addListener(() {
-        //     if (video.controller.value.isPlaying) {
-        //       add(UpdateProgress(
-        //         video.id,
-        //         video.controller.value.position
-        //       ));
-        //     }
-        //   })
-        // );
       }
 
       emit(
@@ -70,26 +60,37 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     }
   }
 
+  // Handle video playback start/resume
   Future<void> _onPlay(PlayVideo event, Emitter<VideoState> emit) async {
     if (state is! VideoSequenceReady) return;
     final currentState = state as VideoSequenceReady;
 
+   // Cancel existing timers
     _pauseTimer?.cancel();
 
     // Only set timers in initial phase
     if (!currentState.isFinalPhase) {
-      if (currentState.currentVideoIndex == 0) {
-        _pauseTimer = Timer(
-          const Duration(seconds: 15),
-          () => add(PauseVideo()),
-        );
-      } else if (currentState.currentVideoIndex == 1) {
-        _pauseTimer = Timer(
-          const Duration(seconds: 20),
-          () => add(PauseVideo()),
-        );
-      }
+      _pauseTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+        final position =
+            currentState
+                .videos[currentState.currentVideoIndex]
+                .controller
+                .value
+                .position
+                .inSeconds;
+
+         // Check pause conditions based on current video
+        if ((currentState.currentVideoIndex == 0 && position >= 15) ||
+            (currentState.currentVideoIndex == 1 && position >= 20)) {
+          timer.cancel();
+          add(PauseVideo());
+        }
+      });
+
+     
     }
+
+    // Start video playback
 
     await currentState.videos[currentState.currentVideoIndex].controller.play();
 
@@ -105,32 +106,8 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
 
     emit(currentState.copyWith(playbackState: PlaybackState.playing));
   }
-  // Future<void> _onPlay(PlayVideo event, Emitter<VideoState> emit) async {
-  //   if (state is! VideoSequenceReady) return;
-  //   final currentState = state as VideoSequenceReady;
-  //   // Start completion checker
-  //   _completionCheckTimer?.cancel();
-  //   _completionCheckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-  //     final controller =
-  //         currentState.videos[currentState.currentVideoIndex].controller;
-  //     if (controller.value.position >= controller.value.duration) {
-  //       add(VideoCompleted());
-  //     }
-  //   });
 
-  //   await currentState.videos[currentState.currentVideoIndex].controller.play();
-
-  //   _pauseTimer?.cancel();
-  //   if (currentState.currentVideoIndex == 0) {
-  //     _pauseTimer = Timer(const Duration(seconds: 15), () => add(PauseVideo()));
-  //   } else if (currentState.currentVideoIndex == 1 &&
-  //       !currentState.isSecondPlay) {
-  //     _pauseTimer = Timer(const Duration(seconds: 20), () => add(PauseVideo()));
-  //   }
-
-  //   emit(currentState.copyWith(playbackState: PlaybackState.playing));
-  // }
-
+  // Handle video pause events
   Future<void> _onPause(PauseVideo event, Emitter<VideoState> emit) async {
     if (state is! VideoSequenceReady) return;
     final currentState = state as VideoSequenceReady;
@@ -146,6 +123,7 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     _handleSequenceAfterPause(currentState, emit);
   }
 
+  // Determine next video after pause
   void _handleSequenceAfterPause(
     VideoSequenceReady currentState,
     Emitter<VideoState> emit,
@@ -173,6 +151,7 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     add(PlayVideo());
   }
 
+  // Handle video completion events
   Future<void> _onVideoCompleted(
     VideoCompleted event,
     Emitter<VideoState> emit,
@@ -231,59 +210,7 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     }
   }
 
-  // Future<void> _onVideoCompleted(
-  //   VideoCompleted event,
-  //   Emitter<VideoState> emit,
-  // ) async {
-  //   if (state is! VideoSequenceReady) return;
-  //   final currentState = state as VideoSequenceReady;
-  //   final currentIndex = currentState.currentVideoIndex;
-
-  //   if (currentIndex == 2) {
-  //     // Restart second video without duration limit
-  //     await currentState.videos[1].controller.seekTo(Duration.zero);
-  //     emit(
-  //       currentState.copyWith(
-  //         currentVideoIndex: 1,
-  //         playbackState: PlaybackState.playing,
-  //         isSecondPlay: true, // Add this flag
-  //       ),
-  //     );
-  //     add(PlayVideo());
-  //   } else if (currentIndex == 1) {
-  //     if (currentState.isSecondPlay) {
-  //       // Resume first video from saved position
-  //       final firstVideo = currentState.videos[0];
-  //       await firstVideo.controller.seekTo(firstVideo.position);
-  //       emit(
-  //         currentState.copyWith(
-  //           currentVideoIndex: 0,
-  //           playbackState: PlaybackState.playing,
-  //           isSecondPlay: false,
-  //         ),
-  //       );
-  //       add(PlayVideo());
-  //     } else {
-  //       // First time playing second video
-  //       emit(
-  //         currentState.copyWith(
-  //           currentVideoIndex: 2,
-  //           playbackState: PlaybackState.playing,
-  //         ),
-  //       );
-  //       add(PlayVideo());
-  //     }
-  //   } else if (currentIndex == 0) {
-  //     // First video completed, end sequence
-  //     emit(
-  //       currentState.copyWith(
-  //         playbackState: PlaybackState.paused,
-  //         isSequenceComplete: true,
-  //       ),
-  //     );
-  //   }
-  // }
-
+  // Update video progress in state
   void _onUpdateProgress(UpdateProgress event, Emitter<VideoState> emit) {
     if (state is! VideoSequenceReady) return;
     final currentState = state as VideoSequenceReady;
@@ -299,6 +226,7 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     emit(currentState.copyWith(videos: updatedVideos));
   }
 
+  // Handle app backgrounding
   Future<void> _onAppPaused(AppPaused event, Emitter<VideoState> emit) async {
     if (state is! VideoSequenceReady) return;
     final currentState = state as VideoSequenceReady;
@@ -310,6 +238,7 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     }
   }
 
+  // Handle app foregrounding
   Future<void> _onAppResumed(AppResumed event, Emitter<VideoState> emit) async {
     if (state is! VideoSequenceReady) return;
     final currentState = state as VideoSequenceReady;
@@ -324,6 +253,9 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
   Future<void> close() {
     _completionCheckTimer?.cancel();
     _pauseTimer?.cancel();
+    for (final listener in _positionListeners) {
+      listener();
+    }
 
     return super.close();
   }

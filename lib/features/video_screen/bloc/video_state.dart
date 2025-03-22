@@ -11,15 +11,15 @@ class VideoSequenceReady extends VideoState {
   final int currentVideoIndex;
   final PlaybackState playbackState;
   final bool isSequenceComplete;
-  final bool isSecondPlay;
-  final bool isFinalPhase;
+ 
+  final bool isFinalPhase; // Flag to track final playback phase (after third video)
 
   VideoSequenceReady({
     required this.videos,
     required this.currentVideoIndex,
     required this.playbackState,
     this.isSequenceComplete = false,
-    this.isSecondPlay = false,
+   
       this.isFinalPhase = false,
   });
 
@@ -28,7 +28,7 @@ class VideoSequenceReady extends VideoState {
     int? currentVideoIndex,
     PlaybackState? playbackState,
     bool? isSequenceComplete,
-    bool? isSecondPlay,
+   
       bool? isFinalPhase,
   }) {
     return VideoSequenceReady(
@@ -36,12 +36,12 @@ class VideoSequenceReady extends VideoState {
       currentVideoIndex: currentVideoIndex ?? this.currentVideoIndex,
       playbackState: playbackState ?? this.playbackState,
       isSequenceComplete: isSequenceComplete ?? this.isSequenceComplete,
-      isSecondPlay: isSecondPlay ?? this.isSecondPlay,
+    
       isFinalPhase: isFinalPhase ?? this.isFinalPhase,
     );
   }
 }
-
+// Error state for video loading failures
 class VideoSequenceError extends VideoState {
   final String message;
 
