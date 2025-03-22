@@ -73,6 +73,26 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
   Future<void> _onPlay(PlayVideo event, Emitter<VideoState> emit) async {
     if (state is! VideoSequenceReady) return;
     final currentState = state as VideoSequenceReady;
+
+    _pauseTimer?.cancel();
+
+    // Only set timers in initial phase
+    if (!currentState.isFinalPhase) {
+      if (currentState.currentVideoIndex == 0) {
+        _pauseTimer = Timer(
+          const Duration(seconds: 15),
+          () => add(PauseVideo()),
+        );
+      } else if (currentState.currentVideoIndex == 1) {
+        _pauseTimer = Timer(
+          const Duration(seconds: 20),
+          () => add(PauseVideo()),
+        );
+      }
+    }
+
+    await currentState.videos[currentState.currentVideoIndex].controller.play();
+
     // Start completion checker
     _completionCheckTimer?.cancel();
     _completionCheckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -83,18 +103,33 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
       }
     });
 
-    await currentState.videos[currentState.currentVideoIndex].controller.play();
-
-    _pauseTimer?.cancel();
-    if (currentState.currentVideoIndex == 0) {
-      _pauseTimer = Timer(const Duration(seconds: 15), () => add(PauseVideo()));
-    } else if (currentState.currentVideoIndex == 1 &&
-        !currentState.isSecondPlay) {
-      _pauseTimer = Timer(const Duration(seconds: 20), () => add(PauseVideo()));
-    }
-
     emit(currentState.copyWith(playbackState: PlaybackState.playing));
   }
+  // Future<void> _onPlay(PlayVideo event, Emitter<VideoState> emit) async {
+  //   if (state is! VideoSequenceReady) return;
+  //   final currentState = state as VideoSequenceReady;
+  //   // Start completion checker
+  //   _completionCheckTimer?.cancel();
+  //   _completionCheckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+  //     final controller =
+  //         currentState.videos[currentState.currentVideoIndex].controller;
+  //     if (controller.value.position >= controller.value.duration) {
+  //       add(VideoCompleted());
+  //     }
+  //   });
+
+  //   await currentState.videos[currentState.currentVideoIndex].controller.play();
+
+  //   _pauseTimer?.cancel();
+  //   if (currentState.currentVideoIndex == 0) {
+  //     _pauseTimer = Timer(const Duration(seconds: 15), () => add(PauseVideo()));
+  //   } else if (currentState.currentVideoIndex == 1 &&
+  //       !currentState.isSecondPlay) {
+  //     _pauseTimer = Timer(const Duration(seconds: 20), () => add(PauseVideo()));
+  //   }
+
+  //   emit(currentState.copyWith(playbackState: PlaybackState.playing));
+  // }
 
   Future<void> _onPause(PauseVideo event, Emitter<VideoState> emit) async {
     if (state is! VideoSequenceReady) return;
@@ -147,26 +182,27 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
     final currentIndex = currentState.currentVideoIndex;
 
     if (currentIndex == 2) {
-      // Restart second video without duration limit
+      // Restart second video (full playback)
       await currentState.videos[1].controller.seekTo(Duration.zero);
       emit(
         currentState.copyWith(
           currentVideoIndex: 1,
           playbackState: PlaybackState.playing,
-          isSecondPlay: true, // Add this flag
+          isFinalPhase: true, // New flag to track final sequence phase
         ),
       );
       add(PlayVideo());
     } else if (currentIndex == 1) {
-      if (currentState.isSecondPlay) {
-        // Resume first video from saved position
-        final firstVideo = currentState.videos[0];
-        await firstVideo.controller.seekTo(firstVideo.position);
+      if (currentState.isFinalPhase) {
+        // Resume first video from 15s (full playback)
+        await currentState.videos[0].controller.seekTo(
+          const Duration(seconds: 15),
+        );
         emit(
           currentState.copyWith(
             currentVideoIndex: 0,
             playbackState: PlaybackState.playing,
-            isSecondPlay: false,
+            isFinalPhase: true,
           ),
         );
         add(PlayVideo());
@@ -181,15 +217,72 @@ class VideoBloc extends Bloc<VideoEvent, VideoState> {
         add(PlayVideo());
       }
     } else if (currentIndex == 0) {
-      // First video completed, end sequence
+      // First video completed in final phase
+      await currentState.videos[0].controller.pause();
+      await currentState.videos[0].controller.seekTo(Duration.zero);
       emit(
         currentState.copyWith(
           playbackState: PlaybackState.paused,
           isSequenceComplete: true,
+          isFinalPhase: false,
+          currentVideoIndex: 0,
         ),
       );
     }
   }
+
+  // Future<void> _onVideoCompleted(
+  //   VideoCompleted event,
+  //   Emitter<VideoState> emit,
+  // ) async {
+  //   if (state is! VideoSequenceReady) return;
+  //   final currentState = state as VideoSequenceReady;
+  //   final currentIndex = currentState.currentVideoIndex;
+
+  //   if (currentIndex == 2) {
+  //     // Restart second video without duration limit
+  //     await currentState.videos[1].controller.seekTo(Duration.zero);
+  //     emit(
+  //       currentState.copyWith(
+  //         currentVideoIndex: 1,
+  //         playbackState: PlaybackState.playing,
+  //         isSecondPlay: true, // Add this flag
+  //       ),
+  //     );
+  //     add(PlayVideo());
+  //   } else if (currentIndex == 1) {
+  //     if (currentState.isSecondPlay) {
+  //       // Resume first video from saved position
+  //       final firstVideo = currentState.videos[0];
+  //       await firstVideo.controller.seekTo(firstVideo.position);
+  //       emit(
+  //         currentState.copyWith(
+  //           currentVideoIndex: 0,
+  //           playbackState: PlaybackState.playing,
+  //           isSecondPlay: false,
+  //         ),
+  //       );
+  //       add(PlayVideo());
+  //     } else {
+  //       // First time playing second video
+  //       emit(
+  //         currentState.copyWith(
+  //           currentVideoIndex: 2,
+  //           playbackState: PlaybackState.playing,
+  //         ),
+  //       );
+  //       add(PlayVideo());
+  //     }
+  //   } else if (currentIndex == 0) {
+  //     // First video completed, end sequence
+  //     emit(
+  //       currentState.copyWith(
+  //         playbackState: PlaybackState.paused,
+  //         isSequenceComplete: true,
+  //       ),
+  //     );
+  //   }
+  // }
 
   void _onUpdateProgress(UpdateProgress event, Emitter<VideoState> emit) {
     if (state is! VideoSequenceReady) return;

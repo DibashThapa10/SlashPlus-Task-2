@@ -49,33 +49,37 @@ class _VideoScreenState extends State<VideoScreen> with WidgetsBindingObserver {
         },
         builder: (context, state) {
           if (state is VideoSequenceReady) {
-            // return _buildPlayerUI(state);
             final currentVideo = state.videos[state.currentVideoIndex];
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Column(
                 children: [
-                  Column(
+                  Text(
+                    currentVideo.title,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Text(
-                        currentVideo.title,
-                        style: const TextStyle(fontSize: 18),
-                      ),
                       _VideoPlayerWithControls(
                         currentVideo: state.videos[state.currentVideoIndex],
                       ),
-                      _TimersDisplay(
-                        video: state.videos[state.currentVideoIndex],
-                      ),
+                      if (state.isSequenceComplete ||
+                          state.playbackState == PlaybackState.paused)
+                        _RestartControls(
+                          isPlaying:
+                              state.playbackState == PlaybackState.playing,
+                          isComplete: state.isSequenceComplete,
+                        ),
                     ],
                   ),
-
-                  // if (state.isSequenceComplete ||
-                  //     state.playbackState == PlaybackState.paused)
-                  _RestartControls(
-                    isPlaying: state.playbackState == PlaybackState.playing,
-                    isComplete: state.isSequenceComplete,
+                  _TimersDisplay(video: state.videos[state.currentVideoIndex]),
+                  Expanded(
+                    child: _VideoProgressList(
+                      videos: state.videos,
+                      currentIndex: state.currentVideoIndex,
+                    ),
                   ),
                 ],
               ),
@@ -85,6 +89,68 @@ class _VideoScreenState extends State<VideoScreen> with WidgetsBindingObserver {
           }
           return const Center(child: CircularProgressIndicator());
         },
+      ),
+    );
+  }
+}
+
+class _VideoProgressList extends StatelessWidget {
+  final List<VideoDataModel> videos;
+  final int currentIndex;
+
+  const _VideoProgressList({required this.videos, required this.currentIndex});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: videos.length,
+      itemBuilder: (context, index) {
+        final video = videos[index];
+        return _VideoProgressItem(
+          video: video,
+          isActive: index == currentIndex,
+        );
+      },
+    );
+  }
+}
+
+class _VideoProgressItem extends StatelessWidget {
+  final VideoDataModel video;
+  final bool isActive;
+
+  const _VideoProgressItem({required this.video, required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = video.position.inSeconds / video.duration.inSeconds;
+
+    return Card(
+      elevation: 2,
+      color: isActive ? Colors.blue[50] : Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              video.title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.grey[300],
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isActive ? Colors.blue : Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -176,12 +242,19 @@ class _RestartControls extends StatelessWidget {
         child:
             isComplete
                 ? ElevatedButton.icon(
-                  icon: const Icon(Icons.replay),
-                  label: const Text('Restart Sequence'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                  ),
+                  icon: const Icon(Icons.restart_alt, color: Colors.white),
+                  label: const Text(
+                    'Restart',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onPressed:
                       () => context.read<VideoBloc>().add(InitializeVideos()),
                 )
                 : FloatingActionButton(
+                  backgroundColor: Colors.transparent,
                   onPressed: () {
                     if (isPlaying) {
                       context.read<VideoBloc>().add(PauseVideo());
@@ -189,7 +262,11 @@ class _RestartControls extends StatelessWidget {
                       context.read<VideoBloc>().add(PlayVideo());
                     }
                   },
-                  child: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                  child: Icon(
+                    isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 30,
+                  ),
                 ),
       ),
     );
